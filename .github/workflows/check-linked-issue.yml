@@ -1,0 +1,24 @@
+name: Check Linked Issue
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-linked-issue:
+    name: "Check Linked Issue"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR body contains linked issue pattern
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            // Match keywords: Fixes #12, Closes #12, Resolves #12, etc.
+            const linkRegex = /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#\d+/i;
+            
+            if (!linkRegex.test(body)) {
+              core.setFailed('❌ PR validation failed: PR body must contain a linked issue keyword! Example: "Fixes #12" or "Resolves #5".');
+            } else {
+              console.log('✅ Linked issue validation passed!');
+            }
