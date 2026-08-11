@@ -1,0 +1,9 @@
+# Agents
+.agents/
+.claude/
+
+# MCP
+.codegraph/
+
+# Skills Related
+skills-lock.json
