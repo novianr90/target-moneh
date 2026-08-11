@@ -1,7 +1,8 @@
 # Technical Specification (TargetMoneh)
 
-**Version:** 1.0.0
-**Reference:** [PRD-Personal-Savings-Tracker.md](PRD-Personal-Savings-Tracker.md)
+**Version:** 1.0.0  
+**Reference PRD:** [PRD-Personal-Savings-Tracker.md](PRD-Personal-Savings-Tracker.md)  
+**Main Index:** [README.md](../README.md)
 
 This document details the system layer, framework stack, and core logic components for TargetMoneh. It acts as the bridge between product requirements and physical implementation.
 
@@ -13,13 +14,29 @@ This document details the system layer, framework stack, and core logic componen
 - **Styling:** Tailwind CSS + Lucide Icons
 - **State & Data Fetching:** `@tanstack/svelte-query`
 - **Authentication:** Supabase Auth + `@supabase/ssr`
-- **Database:** Supabase PostgreSQL
+- **Database:** Supabase PostgreSQL (`bigint` for IDR amounts)
 - **Serverless/Background Compute:** Supabase Edge Functions
 - **External Integration:** Google Apps Script Web App (Spreadsheet Sync)
 
 ---
 
-## 2. Authentication & Session Strategy
+## 2. Issue & Roadmap Traceability Matrix (v1.0 MVP)
+
+| Issue | Module Name | Primary Responsibilities | Reference Doc |
+| :--- | :--- | :--- | :--- |
+| [#1](https://github.com/novianr90/target-moneh/issues/1) | Auth & Session Infrastructure | Supabase Auth + `@supabase/ssr` cookies & route guards | §3, [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) |
+| [#2](https://github.com/novianr90/target-moneh/issues/2) | Accounts Metadata (`saving_accounts`) | CRUD & Archive lifecycle for source accounts | §5.1, [DATABASE.md](DATABASE.md) §2.1 |
+| [#3](https://github.com/novianr90/target-moneh/issues/3) | Category Master (`saving_categories`) | CRUD & Archive lifecycle for categories | §5.2, [DATABASE.md](DATABASE.md) §2.2 |
+| [#4](https://github.com/novianr90/target-moneh/issues/4) | Goal Targets (`saving_targets`) | Goal creation, deadlines, priority, pause/cancel | §5.3, [DATABASE.md](DATABASE.md) §2.3 |
+| [#5](https://github.com/novianr90/target-moneh/issues/5) | Transactions (`saving_transactions`) | Deposits, withdrawals, atomic balance validation | §5.4, [DATABASE.md](DATABASE.md) §2.4 |
+| [#6](https://github.com/novianr90/target-moneh/issues/6) | Balance View & Security | `v_saving_target_balances` & RLS composite policies | §6.4, [DATABASE.md](DATABASE.md) §3.1 |
+| [#7](https://github.com/novianr90/target-moneh/issues/7) | Deterministic Recommendation Engine | Required monthly, Velocity, Forecast, Health math | §7, `src/lib/engines/` |
+| [#8](https://github.com/novianr90/target-moneh/issues/8) | Dashboard & Timeline UI | Hero Card, Total Active Balance, Goal Cards, FAB | §5.5, [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) |
+| [#9](https://github.com/novianr90/target-moneh/issues/9) | Spreadsheet Sync Engine | Edge Function `sync-savings` proxy to GAS Web App | §8, [SPREADSHEET.md](SPREADSHEET.md) |
+
+---
+
+## 3. Authentication & Session Strategy
 
 TargetMoneh completely delegates authentication to **Supabase Auth**.
 
@@ -31,7 +48,7 @@ TargetMoneh completely delegates authentication to **Supabase Auth**.
 
 ---
 
-## 3. Data Fetching & State Management
+## 4. Data Fetching & State Management
 
 **Tool:** `@tanstack/svelte-query`
 
@@ -45,7 +62,7 @@ TargetMoneh completely delegates authentication to **Supabase Auth**.
 
 ---
 
-## 4. UI/UX Principles (v1.0)
+## 5. UI/UX Principles (v1.0)
 
 - **Speed:** The transaction modal must be launchable via a Floating Action Button (FAB) and completeable via keyboard within 10 seconds.
 - **No Cents:** All formatting utilizes IDR integer rounding (`new Intl.NumberFormat('id-ID')` without decimals).
@@ -53,11 +70,11 @@ TargetMoneh completely delegates authentication to **Supabase Auth**.
 
 ---
 
-## 5. Calculation Engine Implementation
+## 6. Calculation Engine Implementation
 
 The engine runs on the client-side/server-side logic based on fetched transaction histories and goal properties. It is deterministic.
 
-### 5.1 Remaining Contribution Periods ($N_{months}$)
+### 6.1 Remaining Contribution Periods ($N_{months}$)
 ```typescript
 function getRemainingMonths(targetDate: Date, today: Date = new Date()): number {
   return (targetDate.getFullYear() - today.getFullYear()) * 12 +
@@ -65,7 +82,7 @@ function getRemainingMonths(targetDate: Date, today: Date = new Date()): number 
 }
 ```
 
-### 5.2 Required Monthly Savings
+### 6.2 Required Monthly Savings
 ```typescript
 function getRequiredMonthlySavings(balance: number, target: number, remainingMonths: number): number {
   if (balance >= target) return 0;
@@ -75,7 +92,7 @@ function getRequiredMonthlySavings(balance: number, target: number, remainingMon
 }
 ```
 
-### 5.3 Savings Velocity
+### 6.3 Savings Velocity
 Calculates net velocity over the last 6 completed calendar months.
 
 1. Filter transactions to exclude the current incomplete month.
@@ -84,7 +101,7 @@ Calculates net velocity over the last 6 completed calendar months.
 4. Take up to the 6 most recent months from that group.
 5. `Velocity = sum(net contributions in those months) / count(months)`
 
-### 5.4 Forecast Projection
+### 6.4 Forecast Projection
 ```typescript
 function getProjectedMonths(balance: number, target: number, velocity: number): number | 'infinite' {
   if (balance >= target) return 0;
@@ -95,7 +112,7 @@ function getProjectedMonths(balance: number, target: number, velocity: number): 
 
 ---
 
-## 6. Integrations: Spreadsheet Sync
+## 7. Integrations: Spreadsheet Sync
 
 **Mechanism:** Manual trigger via user interface.
 **Path:** Client -> SvelteKit API Route -> Supabase Edge Function -> Google Apps Script -> Google Sheet.
