@@ -73,3 +73,23 @@ Use PostgreSQL `bigint` for all monetary columns (`amount`, `target_amount`).
 **Consequences:** 
 - **Pros:** Avoids floating-point precision errors entirely. Standardizes all math operations.
 - **Cons:** If multi-currency (USD) is ever introduced in v2.0, a migration strategy to `numeric` or storing cents/pennies will be required. (Multi-currency is explicitly Out of Scope for v1.0).
+
+---
+
+## ADR 5: Soft-Archive Lifecycle for Master Data Entities
+
+**Date:** August 2026
+**Status:** Accepted
+
+**Context:** 
+TargetMoneh uses master data entities (`saving_accounts` and `saving_categories`) to tag savings goals and financial transactions. If a user deletes a bank account tag or a goal category tag that was previously attached to historical transactions or active goals, hard-deleting the row would either break foreign key constraints or orphan historical financial audit logs.
+
+**Decision:** 
+Master data entities (`saving_accounts` and `saving_categories`) are **never hard-deleted**. Instead, a soft-archive lifecycle mechanism is implemented via an `archived_at` timestamp:
+- Active entities have `archived_at IS NULL`.
+- Archived entities (`archived_at IS NOT NULL`) remain visible on historical targets and transactions for audit integrity, but are filtered out from selection dropdowns when creating new goals or transactions.
+- Restoration (un-archiving) is supported by resetting `archived_at` to `NULL`.
+
+**Consequences:** 
+- **Pros:** Guarantees 100% historical data integrity and audit trailing without broken references or deleted foreign keys.
+- **Cons:** Requires explicit query filtering (`.is('archived_at', null)`) on selection components across the application.
