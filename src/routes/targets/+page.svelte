@@ -2,18 +2,18 @@
 	import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
 	import { targetsService } from '$lib/services/targets';
 	import { categoriesService } from '$lib/services/categories';
-	import type { SavingTarget, TargetStatus, TargetPriority } from '$lib/types/target';
+	import type { SavingTarget, TargetStatus } from '$lib/types/target';
+	import TargetInsertCard from '$lib/components/targets/TargetInsertCard.svelte';
+	import TargetTable from '$lib/components/targets/TargetTable.svelte';
 	import TargetCard from '$lib/components/targets/TargetCard.svelte';
-	import TargetModal from '$lib/components/targets/TargetModal.svelte';
-	import { Target, Plus, Search, Loader2, ShieldAlert } from '@lucide/svelte';
+	import { Target, Search, Loader2, ShieldAlert, LayoutGrid, Table as TableIcon } from '@lucide/svelte';
 
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
 	let searchQuery = $state('');
 	let statusFilter = $state<TargetStatus | 'all'>('all');
-	let isModalOpen = $state(false);
-	let targetToEdit = $state<SavingTarget | null>(null);
+	let viewMode = $state<'table' | 'grid'>('table');
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
 	// Fetch Targets
@@ -23,7 +23,7 @@
 		enabled: Boolean(data.user?.id)
 	}));
 
-	// Fetch Active Categories for Modal Selection
+	// Fetch Active Categories
 	const categoriesQuery = createQuery(() => ({
 		queryKey: ['saving_categories', data.user?.id, false],
 		queryFn: () => categoriesService.getCategories(false),
@@ -76,22 +76,12 @@
 		}, 5000);
 	}
 
-	function handleOpenCreate() {
-		targetToEdit = null;
-		isModalOpen = true;
+	async function handleSaveInsert(payload: any) {
+		await createMutationHandler.mutateAsync(payload);
 	}
 
-	function handleOpenEdit(target: SavingTarget) {
-		targetToEdit = target;
-		isModalOpen = true;
-	}
-
-	async function handleSaveTarget(payload: any) {
-		if (targetToEdit) {
-			await updateMutationHandler.mutateAsync({ id: targetToEdit.id, payload });
-		} else {
-			await createMutationHandler.mutateAsync(payload);
-		}
+	async function handleInlineUpdate(id: string, payload: any) {
+		await updateMutationHandler.mutateAsync({ id, payload });
 	}
 
 	async function handlePause(target: SavingTarget) {
@@ -118,6 +108,10 @@
 		}
 	}
 
+	async function handleQuickDeposit(target: SavingTarget, amount: number) {
+		showToast('success', `Simpanan Rp ${new Intl.NumberFormat('id-ID').format(amount)} untuk "${target.title}" berhasil disiapkan.`);
+	}
+
 	// Filtered targets
 	const filteredTargets = $derived.by(() => {
 		const targets = targetsQuery.data || [];
@@ -131,7 +125,7 @@
 	<title>Savings Goals - TargetMoneh</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-6 max-w-6xl mx-auto">
 	<!-- Page Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 		<div>
@@ -142,20 +136,9 @@
 				<h1 class="text-2xl font-bold text-white">Savings Goals</h1>
 			</div>
 			<p class="text-slate-400 text-xs mt-1">
-				Track, edit, and prioritize monetary target goals and deadlines.
+				Define targets, deadlines, categories, and track progress seamlessly.
 			</p>
 		</div>
-
-		{#if data.user}
-			<button
-				type="button"
-				onclick={handleOpenCreate}
-				class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-colors cursor-pointer"
-			>
-				<Plus class="w-4 h-4" />
-				<span>New Savings Goal</span>
-			</button>
-		{/if}
 	</div>
 
 	{#if toastMessage}
@@ -165,7 +148,7 @@
 				: 'bg-rose-500/10 border-rose-500/30 text-rose-300'}"
 		>
 			<span>{toastMessage.text}</span>
-			<button type="button" onclick={() => (toastMessage = null)} class="opacity-70 hover:opacity-100">✕</button>
+			<button type="button" onclick={() => (toastMessage = null)} aria-label="Dismiss toast" class="opacity-70 hover:opacity-100">✕</button>
 		</div>
 	{/if}
 
@@ -184,7 +167,13 @@
 			</a>
 		</div>
 	{:else}
-		<!-- Controls Bar -->
+		<!-- Section 1: Card Insert (Top Inline Goal Creation) -->
+		<TargetInsertCard
+			categories={categoriesQuery.data || []}
+			onSave={handleSaveInsert}
+		/>
+
+		<!-- Section 2: Search & Filter Controls -->
 		<div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-4">
 			<!-- Search Input -->
 			<div class="relative flex-1 max-w-sm">
@@ -197,48 +186,72 @@
 				/>
 			</div>
 
-			<!-- Status Filter Tabs -->
-			<div class="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
-				<button
-					type="button"
-					onclick={() => (statusFilter = 'all')}
-					class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'all'
-						? 'bg-slate-800 text-emerald-400'
-						: 'text-slate-400 hover:text-slate-200'}"
-				>
-					All
-				</button>
-				<button
-					type="button"
-					onclick={() => (statusFilter = 'active')}
-					class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'active'
-						? 'bg-slate-800 text-emerald-400'
-						: 'text-slate-400 hover:text-slate-200'}"
-				>
-					Active
-				</button>
-				<button
-					type="button"
-					onclick={() => (statusFilter = 'paused')}
-					class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'paused'
-						? 'bg-slate-800 text-emerald-400'
-						: 'text-slate-400 hover:text-slate-200'}"
-				>
-					Paused
-				</button>
-				<button
-					type="button"
-					onclick={() => (statusFilter = 'cancelled')}
-					class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'cancelled'
-						? 'bg-slate-800 text-emerald-400'
-						: 'text-slate-400 hover:text-slate-200'}"
-				>
-					Cancelled
-				</button>
+			<!-- Status Filter Tabs & View Mode Switch -->
+			<div class="flex items-center gap-3 flex-wrap">
+				<div class="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
+					<button
+						type="button"
+						onclick={() => (statusFilter = 'all')}
+						class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'all'
+							? 'bg-slate-800 text-emerald-400'
+							: 'text-slate-400 hover:text-slate-200'}"
+					>
+						All
+					</button>
+					<button
+						type="button"
+						onclick={() => (statusFilter = 'active')}
+						class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'active'
+							? 'bg-slate-800 text-emerald-400'
+							: 'text-slate-400 hover:text-slate-200'}"
+					>
+						Active
+					</button>
+					<button
+						type="button"
+						onclick={() => (statusFilter = 'paused')}
+						class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'paused'
+							? 'bg-slate-800 text-emerald-400'
+							: 'text-slate-400 hover:text-slate-200'}"
+					>
+						Paused
+					</button>
+					<button
+						type="button"
+						onclick={() => (statusFilter = 'cancelled')}
+						class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {statusFilter === 'cancelled'
+							? 'bg-slate-800 text-emerald-400'
+							: 'text-slate-400 hover:text-slate-200'}"
+					>
+						Cancelled
+					</button>
+				</div>
+
+				<!-- View Mode Selector -->
+				<div class="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
+					<button
+						type="button"
+						onclick={() => (viewMode = 'table')}
+						aria-label="Table View"
+						title="Table View"
+						class="p-1.5 rounded-lg transition-colors {viewMode === 'table' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200'}"
+					>
+						<TableIcon class="w-4 h-4" />
+					</button>
+					<button
+						type="button"
+						onclick={() => (viewMode = 'grid')}
+						aria-label="Grid View"
+						title="Grid View"
+						class="p-1.5 rounded-lg transition-colors {viewMode === 'grid' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200'}"
+					>
+						<LayoutGrid class="w-4 h-4" />
+					</button>
+				</div>
 			</div>
 		</div>
 
-		<!-- List Content -->
+		<!-- Section 3: List of Goals (Table View or Grid View) -->
 		{#if targetsQuery.isLoading}
 			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 flex flex-col items-center gap-3">
 				<Loader2 class="w-6 h-6 animate-spin text-emerald-400" />
@@ -260,32 +273,37 @@
 					{:else if statusFilter !== 'all'}
 						No goals found for status "{statusFilter}".
 					{:else}
-						You haven't created any savings goals yet. Click "New Savings Goal" to define your monetary targets.
+						You haven't created any savings goals yet. Fill out the "Create New Savings Goal" card above to add your first goal.
 					{/if}
 				</p>
 			</div>
+		{:else if viewMode === 'table'}
+			<!-- Table View (With Direct Inline Editing & Direct Deposit) -->
+			<TargetTable
+				targets={filteredTargets}
+				categories={categoriesQuery.data || []}
+				onUpdate={handleInlineUpdate}
+				onPause={handlePause}
+				onResume={handleResume}
+				onCancel={handleCancel}
+				onDelete={handleDelete}
+				onQuickDeposit={handleQuickDeposit}
+			/>
 		{:else}
+			<!-- Grid View -->
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 				{#each filteredTargets as target (target.id)}
 					<TargetCard
 						{target}
-						onEdit={handleOpenEdit}
+						onEdit={() => {}}
 						onPause={handlePause}
 						onResume={handleResume}
 						onCancel={handleCancel}
 						onDelete={handleDelete}
+						onQuickDeposit={handleQuickDeposit}
 					/>
 				{/each}
 			</div>
 		{/if}
 	{/if}
 </div>
-
-<!-- Modal -->
-<TargetModal
-	isOpen={isModalOpen}
-	{targetToEdit}
-	categories={categoriesQuery.data || []}
-	onClose={() => (isModalOpen = false)}
-	onSave={handleSaveTarget}
-/>

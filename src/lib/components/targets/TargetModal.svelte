@@ -146,6 +146,8 @@
 				<button
 					type="button"
 					onclick={onClose}
+					aria-label="Close modal"
+					title="Close modal"
 					class="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
 				>
 					<X class="w-5 h-5" />

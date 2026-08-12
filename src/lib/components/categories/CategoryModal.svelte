@@ -129,6 +129,8 @@
 								type="button"
 								onclick={() => (color = c)}
 								disabled={isSubmitting}
+								aria-label={`Select color ${c}`}
+								title={`Select color ${c}`}
 								class="w-7 h-7 rounded-full border-2 transition-all cursor-pointer {color === c
 									? 'border-white scale-110 shadow-lg'
 									: 'border-transparent hover:scale-105'}"
