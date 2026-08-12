@@ -2,6 +2,7 @@
 	import type { SavingTarget, TargetPriority, TargetStatus } from '$lib/types/target';
 	import type { SavingCategory } from '$lib/types/category';
 	import CategoryIcon from '$lib/components/categories/CategoryIcon.svelte';
+	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import { X, Loader2, Target, Calendar, DollarSign, Tag, Flag } from '@lucide/svelte';
 
 	interface Props {
@@ -196,30 +197,22 @@
 				<!-- Dates Row -->
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 					<!-- Start Date -->
-					<div class="space-y-1.5">
-						<label for="start-date" class="block text-xs font-semibold text-slate-300"> Start Date </label>
-						<input
-							id="start-date"
-							type="date"
-							bind:value={startDate}
-							required
-							disabled={isSubmitting}
-							class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:outline-none focus:border-emerald-500 text-xs"
-						/>
-					</div>
+					<DatePicker
+						label="Start Date"
+						value={startDate}
+						disabled={isSubmitting}
+						onChange={(newDate) => (startDate = newDate)}
+					/>
 
 					<!-- Target Deadline Date -->
-					<div class="space-y-1.5">
-						<label for="target-date" class="block text-xs font-semibold text-slate-300"> Target Deadline </label>
-						<input
-							id="target-date"
-							type="date"
-							bind:value={targetDate}
-							required
-							disabled={isSubmitting}
-							class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:outline-none focus:border-emerald-500 text-xs"
-						/>
-					</div>
+					<DatePicker
+						label="Target Deadline"
+						value={targetDate}
+						minDate={startDate}
+						showPresets={true}
+						disabled={isSubmitting}
+						onChange={(newDate) => (targetDate = newDate)}
+					/>
 				</div>
 
 				<!-- Category & Priority Row -->
