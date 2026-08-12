@@ -22,14 +22,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_saving_accounts_user_name ON public.saving_
 ALTER TABLE public.saving_accounts ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (Optimized with (SELECT auth.uid()))
+DROP POLICY IF EXISTS "select_own" ON public.saving_accounts;
 CREATE POLICY "select_own" ON public.saving_accounts
-  FOR SELECT USING ((SELECT auth.uid()) = user_id);
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "insert_own" ON public.saving_accounts;
 CREATE POLICY "insert_own" ON public.saving_accounts
-  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "update_own" ON public.saving_accounts;
 CREATE POLICY "update_own" ON public.saving_accounts
-  FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "delete_own" ON public.saving_accounts;
 CREATE POLICY "delete_own" ON public.saving_accounts
-  FOR DELETE USING ((SELECT auth.uid()) = user_id);
+  FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
+

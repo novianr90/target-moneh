@@ -22,14 +22,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_saving_categories_user_name ON public.savin
 ALTER TABLE public.saving_categories ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (Optimized with (SELECT auth.uid()))
+DROP POLICY IF EXISTS "select_own" ON public.saving_categories;
 CREATE POLICY "select_own" ON public.saving_categories
-  FOR SELECT USING ((SELECT auth.uid()) = user_id);
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "insert_own" ON public.saving_categories;
 CREATE POLICY "insert_own" ON public.saving_categories
-  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "update_own" ON public.saving_categories;
 CREATE POLICY "update_own" ON public.saving_categories
-  FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "delete_own" ON public.saving_categories;
 CREATE POLICY "delete_own" ON public.saving_categories
-  FOR DELETE USING ((SELECT auth.uid()) = user_id);
+  FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
+

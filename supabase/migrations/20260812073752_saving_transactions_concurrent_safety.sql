@@ -33,17 +33,22 @@ CREATE INDEX IF NOT EXISTS idx_saving_tx_date ON public.saving_transactions(user
 ALTER TABLE public.saving_transactions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (Optimized with (SELECT auth.uid()))
+DROP POLICY IF EXISTS "select_own" ON public.saving_transactions;
 CREATE POLICY "select_own" ON public.saving_transactions
-  FOR SELECT USING ((SELECT auth.uid()) = user_id);
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "insert_own" ON public.saving_transactions;
 CREATE POLICY "insert_own" ON public.saving_transactions
-  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "update_own" ON public.saving_transactions;
 CREATE POLICY "update_own" ON public.saving_transactions
-  FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "delete_own" ON public.saving_transactions;
 CREATE POLICY "delete_own" ON public.saving_transactions
-  FOR DELETE USING ((SELECT auth.uid()) = user_id);
+  FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
+
 
 -- Authoritative View: v_saving_target_balances
 CREATE OR REPLACE VIEW public.v_saving_target_balances

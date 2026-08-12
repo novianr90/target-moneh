@@ -32,14 +32,19 @@ CREATE INDEX IF NOT EXISTS idx_saving_targets_category ON public.saving_targets(
 ALTER TABLE public.saving_targets ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (Optimized with (SELECT auth.uid()))
+DROP POLICY IF EXISTS "select_own" ON public.saving_targets;
 CREATE POLICY "select_own" ON public.saving_targets
-  FOR SELECT USING ((SELECT auth.uid()) = user_id);
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "insert_own" ON public.saving_targets;
 CREATE POLICY "insert_own" ON public.saving_targets
-  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "update_own" ON public.saving_targets;
 CREATE POLICY "update_own" ON public.saving_targets
-  FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "delete_own" ON public.saving_targets;
 CREATE POLICY "delete_own" ON public.saving_targets
-  FOR DELETE USING ((SELECT auth.uid()) = user_id);
+  FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
+
