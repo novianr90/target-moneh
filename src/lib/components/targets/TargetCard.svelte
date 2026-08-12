@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { SavingTarget } from '$lib/types/target';
 	import { PRIORITY_LABELS, STATUS_LABELS } from '$lib/types/target';
+	import type { TargetBalance, SavingTransaction } from '$lib/types/transaction';
+	import { calculateGoalMetrics } from '$lib/engines';
 	import CategoryIcon from '$lib/components/categories/CategoryIcon.svelte';
-	import { Target, Calendar, Edit2, Pause, Play, Trash2, Ban, Plus, Loader2 } from '@lucide/svelte';
+	import { Target, Calendar, Edit2, Pause, Play, Trash2, Ban, Plus, Loader2, TrendingUp, Sparkles } from '@lucide/svelte';
 
 	interface Props {
 		target: SavingTarget;
+		balance?: TargetBalance;
+		transactions?: SavingTransaction[];
 		onEdit: (target: SavingTarget) => void;
 		onPause: (target: SavingTarget) => void;
 		onResume: (target: SavingTarget) => void;
@@ -14,7 +18,7 @@
 		onQuickDeposit?: (target: SavingTarget, amount: number) => Promise<void>;
 	}
 
-	let { target, onEdit, onPause, onResume, onCancel, onDelete, onQuickDeposit }: Props = $props();
+	let { target, balance, transactions = [], onEdit, onPause, onResume, onCancel, onDelete, onQuickDeposit }: Props = $props();
 
 	let quickAmountStr = $state('');
 	let isSubmittingDeposit = $state(false);
@@ -22,6 +26,19 @@
 	const priorityInfo = $derived(PRIORITY_LABELS[target.priority] || PRIORITY_LABELS.medium);
 	const statusInfo = $derived(STATUS_LABELS[target.status] || STATUS_LABELS.active);
 	const category = $derived(target.saving_categories);
+
+	const metrics = $derived.by(() => {
+		return calculateGoalMetrics({
+			id: target.id,
+			title: target.title,
+			target_amount: target.target_amount,
+			start_date: target.start_date,
+			target_date: target.target_date,
+			status: target.status,
+			current_balance: balance?.current_balance || 0,
+			transactions: transactions || []
+		});
+	});
 
 	function formatIDR(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -83,9 +100,15 @@
 			</span>
 		</div>
 
-		<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border {statusInfo.colorClass}">
-			{statusInfo.label}
-		</span>
+		<div class="flex items-center gap-1.5 flex-wrap">
+			<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 {metrics.health.colorClass}">
+				<span>{metrics.health.badge}</span>
+				<span>{metrics.health.label}</span>
+			</span>
+			<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border {statusInfo.colorClass}">
+				{statusInfo.label}
+			</span>
+		</div>
 	</div>
 
 	<!-- Main Details -->
@@ -94,6 +117,42 @@
 		{#if target.notes}
 			<p class="text-slate-400 text-xs line-clamp-2">{target.notes}</p>
 		{/if}
+	</div>
+
+	<!-- Recommendation Engine Metrics Summary -->
+	<div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2">
+		<div class="flex items-center justify-between text-xs">
+			<span class="text-slate-400 flex items-center gap-1">
+				<Sparkles class="w-3.5 h-3.5 text-amber-400" />
+				<span>Required / Bln</span>
+			</span>
+			<span class="font-bold text-slate-200">
+				{#if metrics.required_monthly_savings === null}
+					<span class="text-rose-400 font-semibold">N/A (Overdue)</span>
+				{:else if metrics.required_monthly_savings === 0}
+					<span class="text-emerald-400 font-bold">Achieved</span>
+				{:else}
+					{formatIDR(metrics.required_monthly_savings)}
+				{/if}
+			</span>
+		</div>
+
+		<div class="flex items-center justify-between text-xs">
+			<span class="text-slate-400 flex items-center gap-1">
+				<TrendingUp class="w-3.5 h-3.5 text-emerald-400" />
+				<span>Savings Velocity</span>
+			</span>
+			<span class="font-bold text-emerald-400">
+				{formatIDR(metrics.savings_velocity)}/bln ({metrics.velocity_months_count} bln)
+			</span>
+		</div>
+
+		<div class="flex items-center justify-between text-xs">
+			<span class="text-slate-400">Projected Completion</span>
+			<span class="font-semibold text-slate-300">
+				{metrics.projected_completion_text}
+			</span>
+		</div>
 	</div>
 
 	<!-- Target Amount & Deadline -->
