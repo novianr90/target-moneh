@@ -4,6 +4,7 @@
 	import type { SavingAccount, AccountType } from '$lib/types/account';
 	import AccountCard from '$lib/components/accounts/AccountCard.svelte';
 	import AccountModal from '$lib/components/accounts/AccountModal.svelte';
+	import Pagination from '$lib/components/ui/Pagination.svelte';
 	import { Landmark, Plus, Search, Filter, Loader2, Archive, ShieldAlert } from '@lucide/svelte';
 
 	let { data } = $props();
@@ -16,6 +17,17 @@
 	let isModalOpen = $state(false);
 	let accountToEdit = $state<SavingAccount | null>(null);
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	// Pagination State
+	let currentPage = $state(1);
+	const pageSize = 10;
+
+	$effect(() => {
+		searchQuery;
+		selectedTypeFilter;
+		showArchived;
+		currentPage = 1;
+	});
 
 	// Fetch Accounts using TanStack Query
 	const accountsQuery = createQuery(() => ({
@@ -119,6 +131,11 @@
 			return matchesSearch && matchesType;
 		});
 	});
+
+	const paginatedAccounts = $derived.by(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredAccounts.slice(start, start + pageSize);
+	});
 </script>
 
 <svelte:head>
@@ -159,7 +176,7 @@
 				: 'bg-rose-500/10 border-rose-500/30 text-rose-300'}"
 		>
 			<span>{toastMessage.text}</span>
-			<button type="button" onclick={() => (toastMessage = null)} class="opacity-70 hover:opacity-100">✕</button>
+			<button type="button" onclick={() => (toastMessage = null)} aria-label="Dismiss toast" class="opacity-70 hover:opacity-100">✕</button>
 		</div>
 	{/if}
 
@@ -196,7 +213,7 @@
 				<div class="relative">
 					<select
 						bind:value={selectedTypeFilter}
-						class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-emerald-500 cursor-pointer"
+						class="px-4 pr-12 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_1rem_center] bg-no-repeat"
 					>
 						<option value="all">All Types</option>
 						<option value="bank">Bank Accounts</option>
@@ -220,7 +237,7 @@
 			</div>
 		</div>
 
-		<!-- List Content -->
+		<!-- List Content + Pagination -->
 		{#if accountsQuery.isLoading}
 			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 flex flex-col items-center gap-3">
 				<Loader2 class="w-6 h-6 animate-spin text-emerald-400" />
@@ -247,15 +264,24 @@
 				</p>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{#each filteredAccounts as account (account.id)}
-					<AccountCard
-						{account}
-						onEdit={handleOpenEdit}
-						onArchive={handleArchive}
-						onUnarchive={handleUnarchive}
-					/>
-				{/each}
+			<div class="space-y-4">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each paginatedAccounts as account (account.id)}
+						<AccountCard
+							{account}
+							onEdit={handleOpenEdit}
+							onArchive={handleArchive}
+							onUnarchive={handleUnarchive}
+						/>
+					{/each}
+				</div>
+
+				<Pagination
+					{currentPage}
+					totalItems={filteredAccounts.length}
+					{pageSize}
+					onPageChange={(p) => (currentPage = p)}
+				/>
 			</div>
 		{/if}
 	{/if}
