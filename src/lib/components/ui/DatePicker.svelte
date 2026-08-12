@@ -39,7 +39,6 @@
 			altInput: true,
 			altFormat: 'd M Y',
 			allowInput: false,
-			theme: 'dark',
 			onChange: (_selectedDates, dateStr) => {
 				onChange(dateStr);
 			}
