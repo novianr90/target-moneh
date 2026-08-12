@@ -19,9 +19,9 @@
 
 	// Fetch Accounts using TanStack Query
 	const accountsQuery = createQuery(() => ({
-		queryKey: ['saving_accounts', showArchived],
+		queryKey: ['saving_accounts', data.user?.id, showArchived],
 		queryFn: () => accountsService.getAccounts(showArchived),
-		enabled: !!data.user
+		enabled: Boolean(data.user?.id)
 	}));
 
 	// Create Mutation

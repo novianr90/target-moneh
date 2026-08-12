@@ -13,20 +13,6 @@
 	let currentUser = $derived(data.user);
 	let currentPath = $derived(page.url.pathname);
 
-	onMount(() => {
-		const {
-			data: { subscription }
-		} = supabase.auth.onAuthStateChange((_event, session) => {
-			if (session?.expires_at !== data.session?.expires_at) {
-				invalidate('supabase:auth');
-			}
-		});
-
-		return () => {
-			subscription.unsubscribe();
-		};
-	});
-
 	const queryClient = new QueryClient({
 		defaultOptions: {
 			queries: {
@@ -36,9 +22,25 @@
 		}
 	});
 
+	onMount(() => {
+		const {
+			data: { subscription }
+		} = supabase.auth.onAuthStateChange((_event, session) => {
+			if (session?.expires_at !== data.session?.expires_at) {
+				queryClient.clear();
+				invalidate('supabase:auth');
+			}
+		});
+
+		return () => {
+			subscription.unsubscribe();
+		};
+	});
+
 	async function handleSignOut() {
 		try {
 			await authService.signOut();
+			queryClient.clear();
 			await invalidate('supabase:auth');
 			goto('/auth');
 		} catch (e) {
