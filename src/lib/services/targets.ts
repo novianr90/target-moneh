@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 import type { SavingTarget, CreateTargetDTO, UpdateTargetDTO, TargetStatus } from '$lib/types/target';
+import { calculateGoalMetrics, type GoalMetrics } from '$lib/engines';
+import { transactionsService } from './transactions';
 
 export const targetsService = {
 	async getTargets(statusFilter: TargetStatus | 'all' = 'all'): Promise<SavingTarget[]> {
@@ -166,5 +168,24 @@ export const targetsService = {
 			}
 			throw error;
 		}
+	},
+
+	async calculateTargetMetrics(targetId: string): Promise<GoalMetrics | null> {
+		const target = await this.getTargetById(targetId);
+		if (!target) return null;
+
+		const balanceInfo = await transactionsService.getTargetBalanceById(targetId);
+		const transactions = await transactionsService.getTransactions(targetId);
+
+		return calculateGoalMetrics({
+			id: target.id,
+			title: target.title,
+			target_amount: target.target_amount,
+			start_date: target.start_date,
+			target_date: target.target_date,
+			status: target.status,
+			current_balance: balanceInfo?.current_balance || 0,
+			transactions
+		});
 	}
 };

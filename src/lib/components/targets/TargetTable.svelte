@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { SavingTarget, TargetPriority, TargetStatus } from '$lib/types/target';
 	import type { SavingCategory } from '$lib/types/category';
+	import type { TargetBalance, SavingTransaction } from '$lib/types/transaction';
+	import { calculateGoalMetrics } from '$lib/engines';
 	import { PRIORITY_LABELS, STATUS_LABELS } from '$lib/types/target';
 	import DatePicker from '$lib/components/ui/DatePicker.svelte';
 	import { Edit2, Pause, Play, Ban, Trash2, Plus, Loader2, Calendar, Check, X } from '@lucide/svelte';
@@ -8,6 +10,8 @@
 	interface Props {
 		targets: SavingTarget[];
 		categories?: SavingCategory[];
+		balances?: TargetBalance[];
+		transactions?: SavingTransaction[];
 		onUpdate: (id: string, payload: any) => Promise<void>;
 		onPause: (target: SavingTarget) => void;
 		onResume: (target: SavingTarget) => void;
@@ -19,6 +23,8 @@
 	let {
 		targets,
 		categories = [],
+		balances = [],
+		transactions = [],
 		onUpdate,
 		onPause,
 		onResume,
@@ -26,6 +32,23 @@
 		onDelete,
 		onQuickDeposit
 	}: Props = $props();
+
+	const balancesMap = $derived.by(() => {
+		const map: Record<string, TargetBalance> = {};
+		for (const b of balances) {
+			map[b.target_id] = b;
+		}
+		return map;
+	});
+
+	const transactionsMap = $derived.by(() => {
+		const map: Record<string, SavingTransaction[]> = {};
+		for (const tx of transactions) {
+			if (!map[tx.target_id]) map[tx.target_id] = [];
+			map[tx.target_id].push(tx);
+		}
+		return map;
+	});
 
 	// Quick deposit amount state per target id
 	let quickAmounts = $state<Record<string, string>>({});
@@ -144,6 +167,16 @@
 					{@const category = target.saving_categories}
 					{@const isSubmittingThisDeposit = submittingDepositId === target.id}
 					{@const amountValue = quickAmounts[target.id] || ''}
+					{@const metrics = calculateGoalMetrics({
+						id: target.id,
+						title: target.title,
+						target_amount: target.target_amount,
+						start_date: target.start_date,
+						target_date: target.target_date,
+						status: target.status,
+						current_balance: balancesMap[target.id]?.current_balance || 0,
+						transactions: transactionsMap[target.id] || []
+					})}
 
 					{#if isEditing}
 						<!-- INLINE EDITING ROW (NO MODAL NEEDED!) -->
@@ -323,11 +356,17 @@
 								{/if}
 							</td>
 
-							<!-- Status -->
+							<!-- Status & Goal Health -->
 							<td class="py-4 px-4 whitespace-nowrap">
-								<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border {statusInfo.colorClass}">
-									{statusInfo.label}
-								</span>
+								<div class="flex items-center gap-1.5 flex-wrap">
+									<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 {metrics.health.colorClass}">
+										<span>{metrics.health.badge}</span>
+										<span>{metrics.health.label}</span>
+									</span>
+									<span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border {statusInfo.colorClass}">
+										{statusInfo.label}
+									</span>
+								</div>
 							</td>
 
 							<!-- Action Icons (Edit, Pause, Cancel, Delete) -->

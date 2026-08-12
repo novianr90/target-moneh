@@ -42,6 +42,20 @@
 		enabled: Boolean(data.user?.id)
 	}));
 
+	// Fetch Target Balances View
+	const balancesQuery = createQuery(() => ({
+		queryKey: ['v_saving_target_balances', data.user?.id],
+		queryFn: () => transactionsService.getTargetBalances(),
+		enabled: Boolean(data.user?.id)
+	}));
+
+	// Fetch Recent Transactions
+	const transactionsQuery = createQuery(() => ({
+		queryKey: ['saving_transactions', data.user?.id],
+		queryFn: () => transactionsService.getTransactions(),
+		enabled: Boolean(data.user?.id)
+	}));
+
 	// Create Mutation
 	const createMutationHandler = createMutation(() => ({
 		mutationFn: (payload: any) => targetsService.createTarget(payload),
@@ -321,6 +335,8 @@
 					<TargetTable
 						targets={paginatedTargets}
 						categories={categoriesQuery.data || []}
+						balances={balancesQuery.data || []}
+						transactions={transactionsQuery.data || []}
 						onUpdate={handleInlineUpdate}
 						onPause={handlePause}
 						onResume={handleResume}
@@ -334,6 +350,8 @@
 						{#each paginatedTargets as target (target.id)}
 							<TargetCard
 								{target}
+								balance={balancesQuery.data?.find((b) => b.target_id === target.id)}
+								transactions={(transactionsQuery.data || []).filter((tx) => tx.target_id === target.id)}
 								onEdit={() => {}}
 								onPause={handlePause}
 								onResume={handleResume}
