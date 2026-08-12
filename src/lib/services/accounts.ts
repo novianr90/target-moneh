@@ -3,9 +3,13 @@ import type { SavingAccount, CreateAccountDTO, UpdateAccountDTO } from '$lib/typ
 
 export const accountsService = {
 	async getAccounts(includeArchived = false): Promise<SavingAccount[]> {
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) return [];
+
 		let query = supabase
 			.from('saving_accounts')
 			.select('*')
+			.eq('user_id', user.id)
 			.order('created_at', { ascending: false });
 
 		if (!includeArchived) {
@@ -18,10 +22,14 @@ export const accountsService = {
 	},
 
 	async getAccountById(id: string): Promise<SavingAccount | null> {
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) return null;
+
 		const { data, error } = await supabase
 			.from('saving_accounts')
 			.select('*')
 			.eq('id', id)
+			.eq('user_id', user.id)
 			.single();
 
 		if (error) throw error;
@@ -47,6 +55,9 @@ export const accountsService = {
 	},
 
 	async updateAccount(id: string, payload: UpdateAccountDTO): Promise<SavingAccount> {
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) throw new Error('User must be authenticated');
+
 		const updates: Record<string, any> = {
 			updated_at: new Date().toISOString()
 		};
@@ -62,6 +73,7 @@ export const accountsService = {
 			.from('saving_accounts')
 			.update(updates)
 			.eq('id', id)
+			.eq('user_id', user.id)
 			.select()
 			.single();
 
@@ -70,6 +82,9 @@ export const accountsService = {
 	},
 
 	async archiveAccount(id: string): Promise<SavingAccount> {
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) throw new Error('User must be authenticated');
+
 		const { data, error } = await supabase
 			.from('saving_accounts')
 			.update({
@@ -77,6 +92,7 @@ export const accountsService = {
 				updated_at: new Date().toISOString()
 			})
 			.eq('id', id)
+			.eq('user_id', user.id)
 			.select()
 			.single();
 
@@ -85,6 +101,9 @@ export const accountsService = {
 	},
 
 	async unarchiveAccount(id: string): Promise<SavingAccount> {
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) throw new Error('User must be authenticated');
+
 		const { data, error } = await supabase
 			.from('saving_accounts')
 			.update({
@@ -92,6 +111,7 @@ export const accountsService = {
 				updated_at: new Date().toISOString()
 			})
 			.eq('id', id)
+			.eq('user_id', user.id)
 			.select()
 			.single();
 
