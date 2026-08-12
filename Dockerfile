@@ -13,12 +13,16 @@ RUN npm prune --production
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# Install curl for Coolify Healthcheck
+RUN apk add --no-cache curl
+
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
 ENV NODE_ENV=production
-ENV PORT=3000
-EXPOSE 3000
+ENV HOST=0.0.0.0
+ARG PORT=3000
+ENV PORT=${PORT}
 
 CMD ["node", "build"]
