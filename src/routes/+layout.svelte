@@ -6,25 +6,12 @@
 	import { supabase } from '$lib/services/supabase';
 	import { authService } from '$lib/services/auth';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
-	import { Target, LogOut, LogIn } from '@lucide/svelte';
+	import { Target, LogOut, LogIn, LayoutDashboard, Landmark } from '@lucide/svelte';
 
 	let { data, children } = $props();
 
 	let currentUser = $derived(data.user);
-
-	onMount(() => {
-		const {
-			data: { subscription }
-		} = supabase.auth.onAuthStateChange((_event, session) => {
-			if (session?.expires_at !== data.session?.expires_at) {
-				invalidate('supabase:auth');
-			}
-		});
-
-		return () => {
-			subscription.unsubscribe();
-		};
-	});
+	let currentPath = $derived(page.url.pathname);
 
 	const queryClient = new QueryClient({
 		defaultOptions: {
@@ -35,9 +22,25 @@
 		}
 	});
 
+	onMount(() => {
+		const {
+			data: { subscription }
+		} = supabase.auth.onAuthStateChange((_event, session) => {
+			if (session?.expires_at !== data.session?.expires_at) {
+				queryClient.clear();
+				invalidate('supabase:auth');
+			}
+		});
+
+		return () => {
+			subscription.unsubscribe();
+		};
+	});
+
 	async function handleSignOut() {
 		try {
 			await authService.signOut();
+			queryClient.clear();
 			await invalidate('supabase:auth');
 			goto('/auth');
 		} catch (e) {
@@ -51,12 +54,33 @@
 		<!-- Top Header -->
 		<header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-40">
 			<div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-				<a href="/" class="flex items-center gap-2.5 font-black text-xl text-white">
-					<div class="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-						<Target class="w-5 h-5" />
-					</div>
-					<span>Target<span class="text-emerald-400">Moneh</span></span>
-				</a>
+				<div class="flex items-center gap-8">
+					<a href="/" class="flex items-center gap-2.5 font-black text-xl text-white">
+						<div class="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+							<Target class="w-5 h-5" />
+						</div>
+						<span>Target<span class="text-emerald-400">Moneh</span></span>
+					</a>
+
+					{#if currentUser}
+						<nav class="hidden md:flex items-center gap-1">
+							<a
+								href="/"
+								class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {currentPath === '/' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+							>
+								<LayoutDashboard class="w-3.5 h-3.5" />
+								<span>Dashboard</span>
+							</a>
+							<a
+								href="/accounts"
+								class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {currentPath.startsWith('/accounts') ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+							>
+								<Landmark class="w-3.5 h-3.5" />
+								<span>Accounts</span>
+							</a>
+						</nav>
+					{/if}
+				</div>
 
 				<div class="flex items-center gap-3">
 					{#if currentUser}
