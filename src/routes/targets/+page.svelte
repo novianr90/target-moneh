@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
+	import { transactionsService } from '$lib/services/transactions';
 	import { targetsService } from '$lib/services/targets';
 	import { categoriesService } from '$lib/services/categories';
 	import type { SavingTarget, TargetStatus } from '$lib/types/target';
 	import TargetInsertCard from '$lib/components/targets/TargetInsertCard.svelte';
 	import TargetTable from '$lib/components/targets/TargetTable.svelte';
 	import TargetCard from '$lib/components/targets/TargetCard.svelte';
+	import Pagination from '$lib/components/ui/Pagination.svelte';
 	import { Target, Search, Loader2, ShieldAlert, LayoutGrid, Table as TableIcon } from '@lucide/svelte';
 
 	let { data } = $props();
@@ -15,6 +17,16 @@
 	let statusFilter = $state<TargetStatus | 'all'>('all');
 	let viewMode = $state<'table' | 'grid'>('table');
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	// Pagination State
+	let currentPage = $state(1);
+	const pageSize = 10;
+
+	$effect(() => {
+		searchQuery;
+		statusFilter;
+		currentPage = 1;
+	});
 
 	// Fetch Targets
 	const targetsQuery = createQuery(() => ({
@@ -108,16 +120,41 @@
 		}
 	}
 
+	// Quick Deposit Mutation Handler
+	const quickDepositMutationHandler = createMutation(() => ({
+		mutationFn: ({ target, amount }: { target: SavingTarget; amount: number }) =>
+			transactionsService.createTransaction({
+				target_id: target.id,
+				amount,
+				transaction_type: 'deposit'
+			}),
+		onSuccess: (tx, variables) => {
+			queryClient.invalidateQueries({ queryKey: ['saving_transactions'] });
+			queryClient.invalidateQueries({ queryKey: ['saving_targets'] });
+			queryClient.invalidateQueries({ queryKey: ['v_saving_target_balances'] });
+			const formatted = new Intl.NumberFormat('id-ID').format(tx.amount);
+			showToast('success', `Berhasil menyetor Rp ${formatted} ke tabungan goal "${variables.target.title}"! 🎉`);
+		},
+		onError: (err: any) => {
+			showToast('error', err.message || 'Gagal menyetor tabungan.');
+		}
+	}));
+
 	async function handleQuickDeposit(target: SavingTarget, amount: number) {
-		showToast('success', `Simpanan Rp ${new Intl.NumberFormat('id-ID').format(amount)} untuk "${target.title}" berhasil disiapkan.`);
+		await quickDepositMutationHandler.mutateAsync({ target, amount });
 	}
 
-	// Filtered targets
+	// Filtered & Paginated targets
 	const filteredTargets = $derived.by(() => {
 		const targets = targetsQuery.data || [];
 		return targets.filter((t) =>
 			t.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
 		);
+	});
+
+	const paginatedTargets = $derived.by(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredTargets.slice(start, start + pageSize);
 	});
 </script>
 
@@ -251,7 +288,7 @@
 			</div>
 		</div>
 
-		<!-- Section 3: List of Goals (Table View or Grid View) -->
+		<!-- Section 3: List of Goals + Pagination -->
 		{#if targetsQuery.isLoading}
 			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 flex flex-col items-center gap-3">
 				<Loader2 class="w-6 h-6 animate-spin text-emerald-400" />
@@ -277,32 +314,43 @@
 					{/if}
 				</p>
 			</div>
-		{:else if viewMode === 'table'}
-			<!-- Table View (With Direct Inline Editing & Direct Deposit) -->
-			<TargetTable
-				targets={filteredTargets}
-				categories={categoriesQuery.data || []}
-				onUpdate={handleInlineUpdate}
-				onPause={handlePause}
-				onResume={handleResume}
-				onCancel={handleCancel}
-				onDelete={handleDelete}
-				onQuickDeposit={handleQuickDeposit}
-			/>
 		{:else}
-			<!-- Grid View -->
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{#each filteredTargets as target (target.id)}
-					<TargetCard
-						{target}
-						onEdit={() => {}}
+			<div class="space-y-4">
+				{#if viewMode === 'table'}
+					<!-- Table View -->
+					<TargetTable
+						targets={paginatedTargets}
+						categories={categoriesQuery.data || []}
+						onUpdate={handleInlineUpdate}
 						onPause={handlePause}
 						onResume={handleResume}
 						onCancel={handleCancel}
 						onDelete={handleDelete}
 						onQuickDeposit={handleQuickDeposit}
 					/>
-				{/each}
+				{:else}
+					<!-- Grid View -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						{#each paginatedTargets as target (target.id)}
+							<TargetCard
+								{target}
+								onEdit={() => {}}
+								onPause={handlePause}
+								onResume={handleResume}
+								onCancel={handleCancel}
+								onDelete={handleDelete}
+								onQuickDeposit={handleQuickDeposit}
+							/>
+						{/each}
+					</div>
+				{/if}
+
+				<Pagination
+					{currentPage}
+					totalItems={filteredTargets.length}
+					{pageSize}
+					onPageChange={(p) => (currentPage = p)}
+				/>
 			</div>
 		{/if}
 	{/if}

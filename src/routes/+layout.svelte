@@ -6,7 +6,7 @@
 	import { supabase } from '$lib/services/supabase';
 	import { authService } from '$lib/services/auth';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
-	import { Target, LogOut, LogIn, LayoutDashboard, Landmark, PiggyBank } from '@lucide/svelte';
+	import { Target, LogOut, LogIn, LayoutDashboard, Landmark, PiggyBank, Zap } from '@lucide/svelte';
 
 	let { data, children } = $props();
 
@@ -91,6 +91,13 @@
 							>
 								<Target class="w-3.5 h-3.5" />
 								<span>Goals</span>
+							</a>
+							<a
+								href="/transactions"
+								class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {currentPath.startsWith('/transactions') ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+							>
+								<Zap class="w-3.5 h-3.5" />
+								<span>Transactions</span>
 							</a>
 						</nav>
 					{/if}

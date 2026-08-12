@@ -159,7 +159,7 @@
 								<div class="flex items-center gap-2">
 									<select
 										bind:value={editCategoryId}
-										class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500"
+										class="px-3.5 pr-8 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
 									>
 										<option value="">No Category</option>
 										{#each categories as cat}
@@ -168,7 +168,7 @@
 									</select>
 									<select
 										bind:value={editPriority}
-										class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500"
+										class="px-3.5 pr-8 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
 									>
 										<option value="high">🔥 High</option>
 										<option value="medium">⚡ Medium</option>
@@ -209,7 +209,7 @@
 							<td class="py-3 px-4">
 								<select
 									bind:value={editStatus}
-									class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500 font-semibold"
+									class="px-3.5 pr-8 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
 								>
 									<option value="active">Active</option>
 									<option value="paused">Paused</option>

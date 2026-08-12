@@ -4,6 +4,7 @@
 	import type { SavingCategory } from '$lib/types/category';
 	import CategoryCard from '$lib/components/categories/CategoryCard.svelte';
 	import CategoryModal from '$lib/components/categories/CategoryModal.svelte';
+	import Pagination from '$lib/components/ui/Pagination.svelte';
 	import { PiggyBank, Plus, Search, Loader2, ShieldAlert } from '@lucide/svelte';
 
 	let { data } = $props();
@@ -15,6 +16,16 @@
 	let isModalOpen = $state(false);
 	let categoryToEdit = $state<SavingCategory | null>(null);
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	// Pagination State
+	let currentPage = $state(1);
+	const pageSize = 10;
+
+	$effect(() => {
+		searchQuery;
+		showArchived;
+		currentPage = 1;
+	});
 
 	// Fetch Categories using TanStack Query
 	const categoriesQuery = createQuery(() => ({
@@ -114,12 +125,17 @@
 		await unarchiveMutationHandler.mutateAsync(category.id);
 	}
 
-	// Filtered categories
+	// Filtered list
 	const filteredCategories = $derived.by(() => {
 		const categories = categoriesQuery.data || [];
 		return categories.filter((cat) =>
 			cat.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
 		);
+	});
+
+	const paginatedCategories = $derived.by(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredCategories.slice(start, start + pageSize);
 	});
 </script>
 
@@ -161,7 +177,7 @@
 				: 'bg-rose-500/10 border-rose-500/30 text-rose-300'}"
 		>
 			<span>{toastMessage.text}</span>
-			<button type="button" onclick={() => (toastMessage = null)} class="opacity-70 hover:opacity-100">✕</button>
+			<button type="button" onclick={() => (toastMessage = null)} aria-label="Dismiss toast" class="opacity-70 hover:opacity-100">✕</button>
 		</div>
 	{/if}
 
@@ -206,7 +222,7 @@
 			</div>
 		</div>
 
-		<!-- List Content -->
+		<!-- List Content + Pagination -->
 		{#if categoriesQuery.isLoading}
 			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 flex flex-col items-center gap-3">
 				<Loader2 class="w-6 h-6 animate-spin text-emerald-400" />
@@ -233,15 +249,24 @@
 				</p>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{#each filteredCategories as category (category.id)}
-					<CategoryCard
-						{category}
-						onEdit={handleOpenEdit}
-						onArchive={handleArchive}
-						onUnarchive={handleUnarchive}
-					/>
-				{/each}
+			<div class="space-y-4">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each paginatedCategories as category (category.id)}
+						<CategoryCard
+							{category}
+							onEdit={handleOpenEdit}
+							onArchive={handleArchive}
+							onUnarchive={handleUnarchive}
+						/>
+					{/each}
+				</div>
+
+				<Pagination
+					{currentPage}
+					totalItems={filteredCategories.length}
+					{pageSize}
+					onPageChange={(p) => (currentPage = p)}
+				/>
 			</div>
 		{/if}
 	{/if}
