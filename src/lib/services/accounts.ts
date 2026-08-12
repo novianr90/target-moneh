@@ -40,17 +40,36 @@ export const accountsService = {
 		const { data: { user }, error: userError } = await supabase.auth.getUser();
 		if (userError || !user) throw new Error('User must be authenticated to create accounts');
 
+		const trimmedName = payload.name.trim();
+
+		// Case-insensitive duplicate check per user
+		const { data: existing } = await supabase
+			.from('saving_accounts')
+			.select('id')
+			.eq('user_id', user.id)
+			.ilike('name', trimmedName)
+			.maybeSingle();
+
+		if (existing) {
+			throw new Error(`An account named "${trimmedName}" already exists.`);
+		}
+
 		const { data, error } = await supabase
 			.from('saving_accounts')
 			.insert({
 				user_id: user.id,
-				name: payload.name.trim(),
+				name: trimmedName,
 				type: payload.type
 			})
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			if (error.code === '23505') {
+				throw new Error(`An account named "${trimmedName}" already exists.`);
+			}
+			throw error;
+		}
 		return data as SavingAccount;
 	},
 
@@ -63,7 +82,21 @@ export const accountsService = {
 		};
 
 		if (payload.name !== undefined) {
-			updates.name = payload.name.trim();
+			const trimmedName = payload.name.trim();
+			updates.name = trimmedName;
+
+			// Case-insensitive duplicate check per user
+			const { data: existing } = await supabase
+				.from('saving_accounts')
+				.select('id')
+				.eq('user_id', user.id)
+				.ilike('name', trimmedName)
+				.neq('id', id)
+				.maybeSingle();
+
+			if (existing) {
+				throw new Error(`An account named "${trimmedName}" already exists.`);
+			}
 		}
 		if (payload.type !== undefined) {
 			updates.type = payload.type;
@@ -77,7 +110,12 @@ export const accountsService = {
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			if (error.code === '23505') {
+				throw new Error(`An account named "${updates.name}" already exists.`);
+			}
+			throw error;
+		}
 		return data as SavingAccount;
 	},
 

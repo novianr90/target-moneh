@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.saving_accounts (
 -- Index for performance & RLS lookup
 CREATE INDEX IF NOT EXISTS idx_saving_accounts_user_id ON public.saving_accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_saving_accounts_user_archived ON public.saving_accounts(user_id, archived_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_saving_accounts_user_name ON public.saving_accounts (user_id, LOWER(name));
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.saving_accounts ENABLE ROW LEVEL SECURITY;
