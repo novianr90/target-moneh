@@ -85,6 +85,13 @@
 								<PiggyBank class="w-3.5 h-3.5" />
 								<span>Categories</span>
 							</a>
+							<a
+								href="/targets"
+								class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {currentPath.startsWith('/targets') ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+							>
+								<Target class="w-3.5 h-3.5" />
+								<span>Goals</span>
+							</a>
 						</nav>
 					{/if}
 				</div>
