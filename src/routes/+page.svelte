@@ -13,8 +13,7 @@
 	import TargetModal from '$lib/components/targets/TargetModal.svelte';
 
 	import type { SavingTarget } from '$lib/types/target';
-	import { Target, Landmark, ArrowRight, TrendingUp, ShieldAlert, Sparkles } from '@lucide/svelte';
-	import { goto } from '$app/navigation';
+	import { Target, Landmark, ArrowRight, TrendingUp } from '@lucide/svelte';
 
 	let { data } = $props();
 	const queryClient = useQueryClient();
