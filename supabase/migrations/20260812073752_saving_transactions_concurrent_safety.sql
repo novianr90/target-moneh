@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_saving_tx_date ON public.saving_transactions(user
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.saving_transactions ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies (Optimized with (SELECT auth.uid()))
+-- RLS Policies (Optimized with TO authenticated and (SELECT auth.uid()))
 DROP POLICY IF EXISTS "select_own" ON public.saving_transactions;
 CREATE POLICY "select_own" ON public.saving_transactions
   FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
@@ -48,7 +48,6 @@ CREATE POLICY "update_own" ON public.saving_transactions
 DROP POLICY IF EXISTS "delete_own" ON public.saving_transactions;
 CREATE POLICY "delete_own" ON public.saving_transactions
   FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
-
 
 -- Authoritative View: v_saving_target_balances
 CREATE OR REPLACE VIEW public.v_saving_target_balances
