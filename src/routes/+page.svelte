@@ -7,7 +7,6 @@
 	import HeroTargetCard from '$lib/components/dashboard/HeroTargetCard.svelte';
 	import SavingsTimeline from '$lib/components/dashboard/SavingsTimeline.svelte';
 	import DashboardGoalList from '$lib/components/dashboard/DashboardGoalList.svelte';
-	import QuickDepositCard from '$lib/components/dashboard/QuickDepositCard.svelte';
 	import RecentTransactionsCard from '$lib/components/dashboard/RecentTransactionsCard.svelte';
 	import QuickDepositModal from '$lib/components/dashboard/QuickDepositModal.svelte';
 	import QuickDepositFAB from '$lib/components/dashboard/QuickDepositFAB.svelte';
@@ -346,16 +345,8 @@
 			onDeleteTarget={handleDeleteTarget}
 		/>
 
-		<!-- Dashboard Quick Deposit & Recent Transactions Widgets -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<QuickDepositCard
-				targets={activeTargets}
-				accounts={accountsQuery.data || []}
-				onDeposit={handleQuickDeposit}
-			/>
-
-			<RecentTransactionsCard transactions={transactionsQuery.data || []} />
-		</div>
+		<!-- Recent Transactions Activity Widget -->
+		<RecentTransactionsCard transactions={transactionsQuery.data || []} />
 
 		<!-- Quick Deposit Floating Action Button (FAB) -->
 		<QuickDepositFAB onClick={() => openDepositModal()} />
