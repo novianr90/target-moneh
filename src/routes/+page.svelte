@@ -3,21 +3,44 @@
 	import { transactionsService } from '$lib/services/transactions';
 	import { targetsService } from '$lib/services/targets';
 	import { accountsService } from '$lib/services/accounts';
-	import QuickDepositCard from '$lib/components/dashboard/QuickDepositCard.svelte';
+
+	import HeroTargetCard from '$lib/components/dashboard/HeroTargetCard.svelte';
+	import SavingsTimeline from '$lib/components/dashboard/SavingsTimeline.svelte';
+	import DashboardGoalList from '$lib/components/dashboard/DashboardGoalList.svelte';
 	import RecentTransactionsCard from '$lib/components/dashboard/RecentTransactionsCard.svelte';
-	import { Target, Zap, Landmark, PiggyBank, ArrowRight, ShieldAlert, TrendingUp } from '@lucide/svelte';
+	import QuickDepositModal from '$lib/components/dashboard/QuickDepositModal.svelte';
+	import QuickDepositFAB from '$lib/components/dashboard/QuickDepositFAB.svelte';
+	import TargetModal from '$lib/components/targets/TargetModal.svelte';
+
+	import type { SavingTarget } from '$lib/types/target';
+	import { Target, Landmark, ArrowRight, TrendingUp, ShieldAlert, Sparkles } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
 	let toastMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
-	// Fetch Active Goals
+	// Quick Deposit Modal State
+	let isDepositModalOpen = $state(false);
+	let selectedTargetForModal = $state<SavingTarget | undefined>(undefined);
+
+	// Target Edit Modal State
+	let isTargetModalOpen = $state(false);
+	let editingTarget = $state<SavingTarget | null>(null);
+
+	// Fetch Targets (All)
 	const targetsQuery = createQuery(() => ({
-		queryKey: ['saving_targets', data.user?.id, 'active'],
-		queryFn: () => targetsService.getTargets('active'),
+		queryKey: ['saving_targets', data.user?.id],
+		queryFn: () => targetsService.getTargets('all'),
 		enabled: Boolean(data.user?.id)
 	}));
+
+	// Fetch Active Targets
+	const activeTargets = $derived.by(() => {
+		const all = targetsQuery.data || [];
+		return all.filter((t) => t.status === 'active');
+	});
 
 	// Fetch Accounts
 	const accountsQuery = createQuery(() => ({
@@ -59,6 +82,53 @@
 		}
 	}));
 
+	// Target Status Update Mutation
+	const targetStatusMutation = createMutation(() => ({
+		mutationFn: ({ id, status }: { id: string; status: any }) =>
+			targetsService.updateTarget(id, { status }),
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({ queryKey: ['saving_targets'] });
+			queryClient.invalidateQueries({ queryKey: ['v_saving_target_balances'] });
+			showToast('success', `Status target berhasil diubah ke ${variables.status}!`);
+		},
+		onError: (err: any) => {
+			showToast('error', err.message || 'Gagal mengubah status target.');
+		}
+	}));
+
+	// Target Delete Mutation
+	const targetDeleteMutation = createMutation(() => ({
+		mutationFn: (id: string) => targetsService.deleteTarget(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['saving_targets'] });
+			queryClient.invalidateQueries({ queryKey: ['v_saving_target_balances'] });
+			showToast('success', 'Target tabungan berhasil dihapus.');
+		},
+		onError: (err: any) => {
+			showToast('error', err.message || 'Gagal menghapus target.');
+		}
+	}));
+
+	// Target Save Mutation (Create/Update)
+	const targetSaveMutation = createMutation(() => ({
+		mutationFn: (payload: any) => {
+			if (editingTarget) {
+				return targetsService.updateTarget(editingTarget.id, payload);
+			}
+			return targetsService.createTarget(payload);
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['saving_targets'] });
+			queryClient.invalidateQueries({ queryKey: ['v_saving_target_balances'] });
+			showToast('success', `Goal target berhasil ${editingTarget ? 'diperbarui' : 'dibuat'}!`);
+			isTargetModalOpen = false;
+			editingTarget = null;
+		},
+		onError: (err: any) => {
+			showToast('error', err.message || 'Gagal menyimpan target.');
+		}
+	}));
+
 	function showToast(type: 'success' | 'error', text: string) {
 		toastMessage = { type, text };
 		setTimeout(() => {
@@ -72,15 +142,61 @@
 		await depositMutationHandler.mutateAsync(payload);
 	}
 
-	// Calculated Stats
-	const totalCollected = $derived.by(() => {
+	async function handleInlineQuickDeposit(target: SavingTarget, amount: number) {
+		await depositMutationHandler.mutateAsync({
+			target_id: target.id,
+			amount,
+			source_account_id: null,
+			notes: 'Quick deposit from dashboard card'
+		});
+	}
+
+	function openDepositModal(target?: SavingTarget) {
+		selectedTargetForModal = target;
+		isDepositModalOpen = true;
+	}
+
+	function handleEditTarget(target: SavingTarget) {
+		editingTarget = target;
+		isTargetModalOpen = true;
+	}
+
+	function handlePauseTarget(target: SavingTarget) {
+		targetStatusMutation.mutate({ id: target.id, status: 'paused' });
+	}
+
+	function handleResumeTarget(target: SavingTarget) {
+		targetStatusMutation.mutate({ id: target.id, status: 'active' });
+	}
+
+	function handleCancelTarget(target: SavingTarget) {
+		if (confirm(`Apakah Anda yakin ingin membatalkan target "${target.title}"?`)) {
+			targetStatusMutation.mutate({ id: target.id, status: 'cancelled' });
+		}
+	}
+
+	function handleDeleteTarget(target: SavingTarget) {
+		if (confirm(`Apakah Anda yakin ingin menghapus target "${target.title}"?`)) {
+			targetDeleteMutation.mutate(target.id);
+		}
+	}
+
+	async function handleSaveTargetModal(payload: any) {
+		await targetSaveMutation.mutateAsync(payload);
+	}
+
+	// PRD Section 5.5: Total Active Goal Balance
+	// "Sum of current_balance across all active targets only."
+	const totalActiveBalance = $derived.by(() => {
 		const balances = balancesQuery.data || [];
-		return balances.reduce((sum, b) => sum + (b.current_balance || 0), 0);
+		const activeIds = new Set(activeTargets.map((t) => t.id));
+		return balances
+			.filter((b) => activeIds.has(b.target_id))
+			.reduce((sum, b) => sum + (b.current_balance || 0), 0);
 	});
 
-	const totalTargetAmount = $derived.by(() => {
-		const targets = targetsQuery.data || [];
-		return targets.reduce((sum, t) => sum + (t.target_amount || 0), 0);
+	const totalActiveTargetAmount = $derived.by(() => {
+		return activeTargets.reduce((sum, t) => sum + (t.target_amount || 0), 0);
 	});
 
 	function formatIDR(amount: number): string {
@@ -96,89 +212,165 @@
 	<title>Dashboard - TargetMoneh</title>
 </svelte:head>
 
-<div class="space-y-6 max-w-6xl mx-auto">
+<div class="space-y-8 max-w-7xl mx-auto pb-12">
 	{#if toastMessage}
 		<div
-			class="p-4 rounded-xl border text-xs font-medium flex items-center justify-between transition-all {toastMessage.type === 'success'
+			class="p-4 rounded-2xl border text-xs font-semibold flex items-center justify-between transition-all shadow-lg {toastMessage.type ===
+			'success'
 				? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
 				: 'bg-rose-500/10 border-rose-500/30 text-rose-300'}"
 		>
 			<span>{toastMessage.text}</span>
-			<button type="button" onclick={() => (toastMessage = null)} aria-label="Dismiss toast" class="opacity-70 hover:opacity-100">✕</button>
+			<button
+				type="button"
+				onclick={() => (toastMessage = null)}
+				aria-label="Dismiss toast"
+				class="opacity-70 hover:opacity-100 font-bold px-2">✕</button
+			>
 		</div>
 	{/if}
 
 	{#if !data.user}
-		<div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
-			<div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-				<Target class="w-6 h-6" />
+		<div
+			class="bg-slate-900 border border-slate-800 rounded-3xl p-8 md:p-12 text-center space-y-6 shadow-2xl"
+		>
+			<div
+				class="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400"
+			>
+				<Target class="w-8 h-8" />
 			</div>
-			<h2 class="text-xl font-extrabold text-white">Welcome to TargetMoneh</h2>
-			<p class="text-slate-400 text-xs max-w-md mx-auto leading-relaxed">
-				Personal savings goal tracker designed for rapid deposits in under 10 seconds. Sign in to start tracking your targets.
-			</p>
+			<div class="space-y-2">
+				<h2 class="text-2xl md:text-3xl font-extrabold text-white">Welcome to TargetMoneh</h2>
+				<p class="text-slate-400 text-xs md:text-sm max-w-lg mx-auto leading-relaxed">
+					Personal savings goal tracker designed for rapid deposits in under 10 seconds. Sign in to
+					track your targets, forecast deadlines, and view monthly savings velocity.
+				</p>
+			</div>
 			<a
 				href="/auth"
-				class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+				class="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-xs md:text-sm font-extrabold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/25"
 			>
 				Sign In / Sign Up
 			</a>
 		</div>
 	{:else}
-		<!-- Header Banner & Quick Stats -->
+		<!-- Header Summary Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-			<!-- Total Savings Balance Card -->
-			<div class="bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 space-y-2 relative overflow-hidden shadow-xl">
+			<!-- Total Active Goal Balance Card (PRD §5.5) -->
+			<div
+				class="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-3xl p-6 space-y-3 relative overflow-hidden shadow-xl"
+			>
+				<div
+					class="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"
+				></div>
 				<div class="flex items-center justify-between">
-					<span class="text-xs font-semibold text-emerald-400">Total Savings Collected</span>
-					<TrendingUp class="w-4 h-4 text-emerald-400" />
+					<span class="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">
+						Total Active Goal Balance
+					</span>
+					<TrendingUp class="w-5 h-5 text-emerald-400" />
 				</div>
-				<div class="text-2xl font-extrabold text-white">{formatIDR(totalCollected)}</div>
-				<div class="text-[11px] text-slate-400">
-					Target Total: <span class="font-bold text-slate-200">{formatIDR(totalTargetAmount)}</span>
+				<div class="text-3xl font-black text-white">{formatIDR(totalActiveBalance)}</div>
+				<div class="text-xs text-slate-400">
+					Active Goal Target: <span class="font-bold text-slate-200"
+						>{formatIDR(totalActiveTargetAmount)}</span
+					>
 				</div>
 			</div>
 
 			<!-- Active Goals Count Card -->
-			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 shadow-xl flex flex-col justify-between">
+			<div
+				class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl flex flex-col justify-between"
+			>
 				<div class="flex items-center justify-between">
-					<span class="text-xs font-semibold text-slate-400">Active Goals</span>
-					<Target class="w-4 h-4 text-slate-400" />
+					<span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Goals</span>
+					<Target class="w-5 h-5 text-slate-400" />
 				</div>
-				<div class="text-2xl font-extrabold text-white">{(targetsQuery.data || []).length} Goals</div>
-				<a href="/targets" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
-					<span>Manage Goals</span>
-					<ArrowRight class="w-3 h-3" />
+				<div class="text-3xl font-black text-white">{activeTargets.length} Active Goals</div>
+				<a
+					href="/targets"
+					class="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+				>
+					<span>Manage All Goals ({targetsQuery.data?.length || 0})</span>
+					<ArrowRight class="w-3.5 h-3.5" />
 				</a>
 			</div>
 
-			<!-- Source Accounts Count Card -->
-			<div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 shadow-xl flex flex-col justify-between">
+			<!-- Master Accounts Count Card -->
+			<div
+				class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl flex flex-col justify-between"
+			>
 				<div class="flex items-center justify-between">
-					<span class="text-xs font-semibold text-slate-400">Master Accounts</span>
-					<Landmark class="w-4 h-4 text-slate-400" />
+					<span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Master Accounts</span>
+					<Landmark class="w-5 h-5 text-slate-400" />
 				</div>
-				<div class="text-2xl font-extrabold text-white">{(accountsQuery.data || []).length} Accounts</div>
-				<a href="/accounts" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+				<div class="text-3xl font-black text-white">
+					{(accountsQuery.data || []).length} Master Accounts
+				</div>
+				<a
+					href="/accounts"
+					class="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+				>
 					<span>Manage Accounts</span>
-					<ArrowRight class="w-3 h-3" />
+					<ArrowRight class="w-3.5 h-3.5" />
 				</a>
 			</div>
 		</div>
 
-		<!-- Main Section: Quick Deposit Widget + Recent Activity -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- Quick Savings Insert Widget (Main Dashboard) -->
-			<QuickDepositCard
-				targets={targetsQuery.data || []}
-				accounts={accountsQuery.data || []}
-				onDeposit={handleQuickDeposit}
-			/>
+		<!-- Hero Target Featured Card -->
+		<HeroTargetCard
+			targets={targetsQuery.data || []}
+			balances={balancesQuery.data || []}
+			transactions={transactionsQuery.data || []}
+			onOpenDeposit={openDepositModal}
+		/>
 
-			<!-- Recent Activity List -->
-			<RecentTransactionsCard
-				transactions={transactionsQuery.data || []}
-			/>
-		</div>
+		<!-- Savings Timeline Visualization Card (PRD §5.5 & §7.3) -->
+		<SavingsTimeline
+			transactions={transactionsQuery.data || []}
+			targets={targetsQuery.data || []}
+			balances={balancesQuery.data || []}
+		/>
+
+		<!-- Goal Cards Grid -->
+		<DashboardGoalList
+			targets={targetsQuery.data || []}
+			balances={balancesQuery.data || []}
+			transactions={transactionsQuery.data || []}
+			onOpenDeposit={openDepositModal}
+			onQuickDepositInline={handleInlineQuickDeposit}
+			onEditTarget={handleEditTarget}
+			onPauseTarget={handlePauseTarget}
+			onResumeTarget={handleResumeTarget}
+			onCancelTarget={handleCancelTarget}
+			onDeleteTarget={handleDeleteTarget}
+		/>
+
+		<!-- Recent Transactions Activity Widget -->
+		<RecentTransactionsCard transactions={transactionsQuery.data || []} />
+
+		<!-- Quick Deposit Floating Action Button (FAB) -->
+		<QuickDepositFAB onClick={() => openDepositModal()} />
+
+		<!-- Quick Deposit Modal -->
+		<QuickDepositModal
+			isOpen={isDepositModalOpen}
+			targets={activeTargets}
+			accounts={accountsQuery.data || []}
+			selectedTargetId={selectedTargetForModal?.id}
+			onClose={() => (isDepositModalOpen = false)}
+			onDeposit={handleQuickDeposit}
+		/>
+
+		<!-- Target Edit Modal -->
+		<TargetModal
+			isOpen={isTargetModalOpen}
+			targetToEdit={editingTarget}
+			categories={[]}
+			onClose={() => {
+				isTargetModalOpen = false;
+				editingTarget = null;
+			}}
+			onSave={handleSaveTargetModal}
+		/>
 	{/if}
 </div>
