@@ -1,9 +1,9 @@
 # Project Structure & Guidelines (TargetMoneh)
 
-**Version:** 1.0.0
+**Version:** 1.0.0  
 **Reference:** [PRD-Personal-Savings-Tracker.md](PRD-Personal-Savings-Tracker.md)
 
-This document defines the folder structure and code responsibility boundaries for the SvelteKit application. It ensures a maintainable and modular codebase.
+This document defines the directory layout and code responsibility boundaries for TargetMoneh across all implemented modules (Issues #1 through #8).
 
 ---
 
@@ -11,10 +11,10 @@ This document defines the folder structure and code responsibility boundaries fo
 
 ```text
 target-moneh/
-├── docs/                      # Core architectural & PRD documentation
+├── docs/                      # Authoritative PRD & Technical Documentation
 ├── supabase/
-│   ├── migrations/            # SQL migration files
-│   ├── functions/             # Supabase Edge Functions (e.g., sync-savings)
+│   ├── migrations/            # Version-controlled SQL migration files
+│   ├── functions/             # Supabase Edge Functions (e.g. sync-savings)
 │   ├── config.toml            # Local Supabase configuration
 │   └── seed.sql               # Local development seed data
 ├── src/
@@ -22,42 +22,46 @@ target-moneh/
 │   ├── app.html               # Main HTML entry point
 │   ├── hooks.server.ts        # @supabase/ssr session management & route guarding
 │   ├── lib/
-│   │   ├── components/        # Reusable UI components (buttons, modals, cards)
-│   │   │   ├── ui/            # Generic/Tailwind base components
-│   │   │   └── target/        # Domain-specific components (e.g., GoalCard.svelte)
-│   │   ├── engines/           # Pure TS math logic (Velocity, Forecast, Health)
-│   │   ├── supabase/          # Supabase client instantiation
+│   │   ├── components/        # Reusable UI components
+│   │   │   ├── ui/            # Base UI controls (DatePicker, Pagination)
+│   │   │   ├── accounts/      # Source account management cards & modals
+│   │   │   ├── categories/    # Category icons & cards
+│   │   │   ├── targets/       # Goal cards, target modals, & tables
+│   │   │   ├── transactions/  # Transaction forms, tables, & widgets
+│   │   │   └── dashboard/     # HeroTargetCard, SavingsTimeline, QuickDepositFAB, QuickDepositModal, DashboardGoalList
+│   │   ├── engines/           # Pure TS math logic (periods, velocity, forecast, health, recommendation)
+│   │   ├── services/          # Supabase client service singletons (accounts, categories, targets, transactions)
 │   │   └── types/             # Shared TypeScript interfaces & DB definitions
 │   └── routes/
 │       ├── +layout.svelte     # Root layout (QueryClientProvider, Session hydration)
 │       ├── +layout.server.ts  # Root server data (passes safe session to client)
-│       ├── auth/              # Login, Register, Logout routes
-│       └── (app)/             # Authenticated routes (Dashboard, Targets, Settings)
+│       ├── +page.svelte       # Main Dashboard (Hero Goal, Timeline, Goal Cards, FAB)
+│       ├── accounts/          # Master accounts management route
+│       ├── categories/        # Category management route
+│       ├── targets/           # Savings goals management route
+│       ├── transactions/      # Savings transactions ledger route
+│       └── auth/              # Authentication routes (Login, Register, Logout)
 ├── tailwind.config.ts         # Tailwind CSS configuration
 └── package.json
 ```
 
 ---
 
-## 2. Code Responsibility Guidelines
+## 2. Code Responsibility Boundaries
 
-### 2.1 Routing & Layouts
-- `(app)/` uses a group layout that *requires* authentication. Unauthenticated users hitting `/(app)/*` are automatically redirected to `/auth` by `hooks.server.ts` or the `+layout.server.ts` guard.
-- SvelteKit `load` functions should generally only load *critical* data (like session state or very initial metadata).
-- **Primary Data Fetching:** Deferred to `@tanstack/svelte-query` within the Svelte components to allow optimistic updates, easy refetching, and caching.
+### 2.1 Routing & Layouts (`src/routes/`)
+- Server `hooks.server.ts` resolves HTTP cookies via `@supabase/ssr` and enforces authentication route guards before rendering.
+- `+layout.server.ts` safely dehydrates session user data to the client.
+- Primary Data Fetching is handled in Svelte components via `@tanstack/svelte-query` for client-side caching, background updates, and optimistic UI invalidations.
 
-### 2.2 `lib/engines/`
-All business logic regarding money forecasting and health calculations MUST reside in pure TypeScript functions inside `src/lib/engines/`.
-- `forecast.ts`
-- `velocity.ts`
-- `health.ts`
+### 2.2 Business & Financial Math (`src/lib/engines/`)
+Pure, deterministic TypeScript logic isolated from UI markup:
+- `periods.ts` — Calendar-month delta calculations ($N_{\text{months}}$) & Required Monthly Savings.
+- `velocity.ts` — 6-month capped historical net savings velocity excluding incomplete current month.
+- `forecast.ts` — Velocity-based projected completion date formatting.
+- `health.ts` — Strict precedence evaluation of Goal Health badges.
+- `recommendation.ts` — Unified goal metrics builder (`calculateGoalMetrics`).
 
-**Rule:** UI components must *never* contain raw velocity/forecast calculation math. They must import and call the engine functions. This allows for unit testing of the financial logic independent of the UI.
-
-### 2.3 `lib/components/`
-- Keep components small and focused.
-- **Dumb Components (`ui/`):** Buttons, inputs, modals. They do not know about Supabase or TanStack Query.
-- **Smart Components:** `DashboardHero.svelte`, `TransactionModal.svelte`. They use TanStack Query hooks to fetch data or trigger mutations.
-
-### 2.4 Supabase Client Instantiation
-Never instantiate the Supabase client directly in a component. Use a singleton/factory pattern in `src/lib/supabase/client.ts` for browser clients, and `src/lib/supabase/server.ts` for server-side clients to prevent cross-request session leakage.
+### 2.3 UI Components (`src/lib/components/`)
+- **Base UI (`ui/`):** Pure input controls, Flatpickr `DatePicker.svelte`, pagination controls.
+- **Domain Components (`dashboard/`, `targets/`, `transactions/`, `accounts/`, `categories/`):** Smart components consuming `@tanstack/svelte-query` mutations, formatting monetary values using IDR integer rules, and providing rapid feedback (<10s deposit workflow).
